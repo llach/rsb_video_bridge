@@ -33,6 +33,8 @@
 
 rsb::Informer<IplImage>::Ptr informer;
 rsc::logging::LoggerPtr logger;
+std::string imageTopic;
+std::string imageScopeAddress;
 
 static void interruptHandler(int /*signal*/) {
 	exit(EXIT_SUCCESS);
@@ -73,6 +75,7 @@ static void logIplImageMetadata(rsc::logging::LoggerPtr log, IplImage* image) {
 }
 
 void image_callback( const sensor_msgs::Image::ConstPtr& image){
+    ROS_INFO("got image");
 
     // convert sensor image to cv::Mat
     cv_bridge::CvImagePtr img_ptr = cv_bridge::toCvCopy(image, "bgr8");
@@ -81,12 +84,13 @@ void image_callback( const sensor_msgs::Image::ConstPtr& image){
     // convert to IplImage*
     int depth=frame.depth();
     int channels=frame.channels();
+
     IplImage *iplImage=cvCreateImage(cvSize(frame.cols,frame.rows),8,channels);
-    iplImage->widthStep = frame.step;
+    iplImage->widthStep = frame.rows * frame.channels() * frame.depth();
     iplImage->imageData=(char*)frame.data;
 
     // display using C-API to visualize the image to be streamed
-    cv::imshow("Published Image", frame);
+    cv::imshow(imageTopic, frame);
     cv::waitKey(1);
 
     // warp in shared_ptr
@@ -123,7 +127,19 @@ int main(int argc, char **argv) {
 
 
 	// Image scope
-	std::string imageScopeAddress("/video");
+	if(nh.getParam("/video_bridge/image_scope", imageScopeAddress)){
+        ROS_INFO("Using %s as image scope", imageScopeAddress.c_str());
+    } else {
+        imageScopeAddress = "/video";
+        ROS_INFO("Using default image scope %s", imageScopeAddress.c_str());
+    }
+
+    if(nh.getParam("/video_bridge/image_topic", imageTopic)){
+        ROS_INFO("Using %s as image topic", imageTopic.c_str());
+    } else {
+        imageTopic = "/image_raw";
+        ROS_INFO("Using default image topic %s", imageTopic.c_str());
+    }
 
 	// Handle ctrl+c interrupts
 	signal(SIGINT, interruptHandler);
@@ -132,10 +148,10 @@ int main(int argc, char **argv) {
 	rsb::Factory &factory = rsb::getFactory();
     informer = factory.createInformer<IplImage>(imageScopeAddress);
 
-    cv::namedWindow("Published Image", CV_WINDOW_AUTOSIZE);
+    cv::namedWindow(imageTopic, CV_WINDOW_AUTOSIZE);
 
     // create subscriber
-        ros::Subscriber sub = nh.subscribe("image_raw", 1000, image_callback);
+        ros::Subscriber sub = nh.subscribe(imageTopic, 1000, image_callback);
 
     ros::spin();
 	return EXIT_SUCCESS;

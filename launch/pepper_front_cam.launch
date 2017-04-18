@@ -1,0 +1,9 @@
+<launch>
+
+  <node pkg="rsb_video_bridge" type="video_bridge" name="video_bridge" output="screen" >
+    <rosparam>
+           image_scope: /video
+           image_topic: /pepper_robot/camera/front/camera/image_raw
+    </rosparam>
+  </node>
+</launch>
